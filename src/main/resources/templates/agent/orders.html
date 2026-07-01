@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{layout/main :: header('Delivery History')}"></head>
+<body>
+
+<div class="app-container">
+    <!-- Sidebar -->
+    <div th:replace="~{layout/main :: sidebar('orders')}"></div>
+
+    <div class="main-wrapper">
+        <!-- Top Navbar -->
+        <div th:replace="~{layout/main :: navbar('Delivery Logs')}"></div>
+
+        <!-- Main Content -->
+        <div class="container-fluid p-4 animate-fade-in">
+            <div class="glass-card">
+                <h5 class="fw-bold mb-4"><i class="bi bi-clock-history me-2 text-primary"></i>Delivery Logs</h5>
+
+                <div th:if="${orderPage.isEmpty()}" class="text-center py-5 text-secondary">
+                    <i class="bi bi-inbox fs-1 mb-3 d-block text-muted"></i>
+                    No delivery tasks logged.
+                </div>
+
+                <div th:if="${!orderPage.isEmpty()}" class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead>
+                            <tr>
+                                <th>Order ID</th>
+                                <th>Date Assigned</th>
+                                <th>Customer Name</th>
+                                <th>Dropoff Address</th>
+                                <th>Fuel Details</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="order : ${orderPage.content}">
+                                <td th:text="'#' + ${order.id}">#1</td>
+                                <td th:text="${#temporals.format(order.updatedAt, 'yyyy-MM-dd HH:mm')}">2026-06-10 10:30</td>
+                                <td th:text="${order.customer.fullName}">John Doe</td>
+                                <td th:text="${order.deliveryAddress}">123 St</td>
+                                <td>
+                                    <span class="badge bg-secondary" th:text="${order.fuelType.name}">Petrol</span>
+                                    <span class="d-block text-xs text-muted" th:text="${order.quantityLiters} + ' L'">40 L</span>
+                                </td>
+                                <td>
+                                    <span class="status-badge" 
+                                          th:classappend="${order.status == 'AGENT_ASSIGNED' ? 'status-assigned' : 
+                                                           (order.status == 'OUT_FOR_DELIVERY' ? 'status-delivery' : 
+                                                           (order.status == 'DELIVERED' ? 'status-delivered' : 
+                                                           (order.status == 'REVIEWED' ? 'status-delivered' : 'status-rejected')))}"
+                                          th:text="${order.status}">
+                                        DELIVERED
+                                    </span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination Grid -->
+                <div th:if="${orderPage.totalPages > 1}" class="d-flex justify-content-between align-items-center mt-4">
+                    <span class="text-secondary text-sm" th:text="'Showing page ' + (${orderPage.number} + 1) + ' of ' + ${orderPage.totalPages}">Page 1 of 5</span>
+                    <nav>
+                        <ul class="pagination pagination-sm mb-0">
+                            <li class="page-item" th:classappend="${!orderPage.hasPrevious()} ? 'disabled' : ''">
+                                <a class="page-link" th:href="@{/agent/orders(page=${orderPage.number - 1})}">Previous</a>
+                            </li>
+                            <li class="page-item" th:each="i : ${#numbers.sequence(0, orderPage.totalPages - 1)}" th:classappend="${orderPage.number == i} ? 'active' : ''">
+                                <a class="page-link" th:href="@{/agent/orders(page=${i})}" th:text="${i + 1}">1</a>
+                            </li>
+                            <li class="page-item" th:classappend="${!orderPage.hasNext()} ? 'disabled' : ''">
+                                <a class="page-link" th:href="@{/agent/orders(page=${orderPage.number + 1})}">Next</a>
+                            </li>
+                        </ul>
+                    </nav>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div th:replace="~{layout/main :: footer}"></div>
+</body>
+</html>

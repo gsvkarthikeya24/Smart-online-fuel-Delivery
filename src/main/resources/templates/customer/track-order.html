@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{layout/main :: header('Track Order')}"></head>
+<body>
+
+<div class="app-container">
+    <!-- Sidebar -->
+    <div th:replace="~{layout/main :: sidebar('history')}"></div>
+
+    <div class="main-wrapper">
+        <!-- Top Navbar -->
+        <div th:replace="~{layout/main :: navbar('Live Order Tracking')}"></div>
+
+        <!-- Main Content -->
+        <div class="container-fluid p-4 animate-fade-in">
+            <div class="row g-4">
+                
+                <!-- Tracking Timeline & Status Details -->
+                <div class="col-lg-5">
+                    <div class="glass-card h-100">
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <h5 class="fw-bold mb-0">Delivery Details</h5>
+                            <span class="badge bg-primary" th:text="'Order #' + ${order.id}">Order #123</span>
+                        </div>
+
+                        <!-- OTP Security Badge (If OUT_FOR_DELIVERY) -->
+                        <div th:if="${order.status == 'OUT_FOR_DELIVERY'}" class="alert alert-warning border-0 bg-warning bg-opacity-10 text-warning rounded-4 p-3 mb-4">
+                            <h6 class="fw-bold mb-1"><i class="bi bi-shield-lock-fill me-2"></i>Security Delivery OTP</h6>
+                            <p class="mb-0 text-sm">Provide this OTP to the delivery agent to confirm drop-off: <strong class="fs-5 text-dark ms-2 text-decoration-underline" th:text="${order.otp}">123456</strong></p>
+                        </div>
+
+                        <!-- Status Timeline -->
+                        <ul class="track-timeline my-4">
+                            <li class="track-timeline-item" th:classappend="${order.status != 'REJECTED'} ? 'completed' : ''">
+                                <h6 class="fw-semibold mb-0">Order Placed</h6>
+                                <p class="text-muted text-xs mb-0">Payment processed successfully</p>
+                            </li>
+                            <li class="track-timeline-item" 
+                                th:classappend="${order.status == 'ACCEPTED' || order.status == 'AGENT_ASSIGNED' || order.status == 'OUT_FOR_DELIVERY' || order.status == 'DELIVERED' || order.status == 'REVIEWED'} ? 'completed' : 
+                                               (order.status == 'CREATED' ? 'active' : '')">
+                                <h6 class="fw-semibold mb-0">Provider Accepted</h6>
+                                <p class="text-muted text-xs mb-0">Fuel stocks verified and reserved</p>
+                            </li>
+                            <li class="track-timeline-item" 
+                                th:classappend="${order.status == 'AGENT_ASSIGNED' || order.status == 'OUT_FOR_DELIVERY' || order.status == 'DELIVERED' || order.status == 'REVIEWED'} ? 'completed' : 
+                                               (order.status == 'ACCEPTED' ? 'active' : '')">
+                                <h6 class="fw-semibold mb-0">Delivery Agent Assigned</h6>
+                                <p class="text-muted text-xs mb-0">Logistics dispatch coordinates verified</p>
+                            </li>
+                            <li class="track-timeline-item" 
+                                th:classappend="${order.status == 'OUT_FOR_DELIVERY' || order.status == 'DELIVERED' || order.status == 'REVIEWED'} ? 'completed' : 
+                                               (order.status == 'AGENT_ASSIGNED' ? 'active' : '')">
+                                <h6 class="fw-semibold mb-0">Out For Delivery</h6>
+                                <p class="text-muted text-xs mb-0">Tanker dispatched to destination address</p>
+                            </li>
+                            <li class="track-timeline-item" 
+                                th:classappend="${order.status == 'DELIVERED' || order.status == 'REVIEWED'} ? 'completed' : 
+                                               (order.status == 'OUT_FOR_DELIVERY' ? 'active' : '')">
+                                <h6 class="fw-semibold mb-0">Delivered</h6>
+                                <p class="text-muted text-xs mb-0">Delivery verified via OTP checkout</p>
+                            </li>
+                        </ul>
+
+                        <div class="mt-4 pt-3 border-top border-light border-opacity-10 text-secondary" style="font-size: 0.9rem;">
+                            <div class="d-flex justify-content-between mb-2">
+                                <span>Provider:</span>
+                                <strong th:text="${order.provider.fullName}">Apex Fuels</strong>
+                            </div>
+                            <div class="d-flex justify-content-between mb-2" th:if="${order.agent != null}">
+                                <span>Delivery Agent:</span>
+                                <strong th:text="${order.agent.fullName}">John Agent</strong>
+                            </div>
+                            <div class="d-flex justify-content-between mb-2">
+                                <span>Fuel:</span>
+                                <strong th:text="${order.fuelType.name} + ' (' + ${#numbers.formatDecimal(order.quantityLiters, 1, 2)} + ' L)'">Diesel (40 L)</strong>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <span>Dropoff:</span>
+                                <strong class="text-end" th:text="${order.deliveryAddress}">123 Main St</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Animated Map Simulation -->
+                <div class="col-lg-7">
+                    <div class="glass-card text-center d-flex flex-column justify-content-between h-100" style="min-height: 450px;">
+                        <h5 class="fw-bold mb-3 text-start"><i class="bi bi-map-fill me-2 text-secondary"></i>Simulated Dispatch Map</h5>
+                        
+                        <!-- Visual Map Container -->
+                        <div class="position-relative flex-grow-1 my-3 bg-dark bg-opacity-25 rounded-4 overflow-hidden border border-light border-opacity-10 d-flex align-items-center justify-content-center" style="height: 300px;">
+                            <svg width="100%" height="100%" viewBox="0 0 600 300" xmlns="http://www.w3.org/2000/svg">
+                                <!-- Background Road Grid -->
+                                <path d="M 50 150 L 550 150" stroke="#4b5563" stroke-width="6" stroke-dasharray="10 5" />
+                                <path d="M 150 50 L 150 250" stroke="#374151" stroke-width="4" />
+                                <path d="M 450 50 L 450 250" stroke="#374151" stroke-width="4" />
+
+                                <!-- Fuel Pump Station Dot -->
+                                <circle cx="100" cy="150" r="14" fill="#6366f1" />
+                                <circle cx="100" cy="150" r="24" fill="#6366f1" fill-opacity="0.15" />
+                                <text x="100" y="190" fill="#94a3b8" font-size="12" text-anchor="middle" font-weight="bold">FUEL DEPOT</text>
+                                
+                                <!-- Customer Dropoff Dot -->
+                                <circle cx="500" cy="150" r="14" fill="#10b981" />
+                                <circle cx="500" cy="150" r="24" fill="#10b981" fill-opacity="0.15" />
+                                <text x="500" y="190" fill="#94a3b8" font-size="12" text-anchor="middle" font-weight="bold">YOUR HOME</text>
+
+                                <!-- Delivery Truck Marker Icon (Calculated based on status) -->
+                                <!-- 
+                                    CREATED: x=100 (at Depot)
+                                    ACCEPTED: x=100
+                                    AGENT_ASSIGNED: x=200
+                                    OUT_FOR_DELIVERY: animated back and forth or x=350
+                                    DELIVERED: x=500 (at customer)
+                                -->
+                                <g id="truck-g" style="transition: all 2s ease-in-out;">
+                                    <rect x="-20" y="-12" width="40" height="24" rx="4" fill="#f43f5e" />
+                                    <rect x="10" y="-10" width="10" height="20" fill="#ffffff" opacity="0.3" />
+                                    <circle cx="-10" cy="14" r="6" fill="#000000" />
+                                    <circle cx="10" cy="14" r="6" fill="#000000" />
+                                </g>
+                            </svg>
+                        </div>
+
+                        <div class="text-start mt-3">
+                            <a th:href="@{/customer/dashboard}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Back to Dashboard</a>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<div th:replace="~{layout/main :: footer}"></div>
+
+<script th:inline="javascript">
+    /*<![CDATA[*/
+    const orderStatus = /*[[${order.status}]]*/ 'CREATED';
+    const truck = document.getElementById('truck-g');
+    
+    // Position truck based on status
+    let xPos = 100;
+    let yPos = 150;
+    
+    if (orderStatus === 'CREATED') {
+        xPos = 100;
+    } else if (orderStatus === 'ACCEPTED') {
+        xPos = 150;
+    } else if (orderStatus === 'AGENT_ASSIGNED') {
+        xPos = 250;
+    } else if (orderStatus === 'OUT_FOR_DELIVERY') {
+        xPos = 380;
+        truck.style.animation = "truckPulse 1.5s infinite alternate";
+    } else if (orderStatus === 'DELIVERED' || orderStatus === 'REVIEWED') {
+        xPos = 500;
+    }
+
+    truck.setAttribute('transform', `translate(${xPos}, ${yPos})`);
+    /*]]>*/
+</script>
+
+<style>
+    @keyframes truckPulse {
+        from { transform: translate(360px, 150px); }
+        to { transform: translate(400px, 150px); }
+    }
+</style>
+
+</body>
+</html>

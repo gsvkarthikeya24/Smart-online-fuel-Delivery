@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{layout/main :: header('System Orders Control')}"></head>
+<body>
+
+<div class="app-container">
+    <!-- Sidebar -->
+    <div th:replace="~{layout/main :: sidebar('orders')}"></div>
+
+    <div class="main-wrapper">
+        <!-- Top Navbar -->
+        <div th:replace="~{layout/main :: navbar('Global Orders Registry')}"></div>
+
+        <!-- Main Content -->
+        <div class="container-fluid p-4 animate-fade-in">
+            <div class="glass-card mb-4">
+                <h5 class="fw-bold mb-3"><i class="bi bi-funnel-fill me-2 text-primary"></i>Filter System Orders</h5>
+                
+                <form th:action="@{/admin/orders}" method="get" class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label text-secondary text-sm">Customer Username</label>
+                        <input type="text" name="customer" th:value="${customer}" class="form-control form-glass" placeholder="e.g. customer1">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label text-secondary text-sm">Order Status</label>
+                        <select name="status" class="form-select form-glass">
+                            <option value="">-- All Statuses --</option>
+                            <option value="CREATED" th:selected="${status == 'CREATED'}">CREATED</option>
+                            <option value="ACCEPTED" th:selected="${status == 'ACCEPTED'}">ACCEPTED</option>
+                            <option value="AGENT_ASSIGNED" th:selected="${status == 'AGENT_ASSIGNED'}">AGENT_ASSIGNED</option>
+                            <option value="OUT_FOR_DELIVERY" th:selected="${status == 'OUT_FOR_DELIVERY'}">OUT_FOR_DELIVERY</option>
+                            <option value="DELIVERED" th:selected="${status == 'DELIVERED'}">DELIVERED</option>
+                            <option value="REJECTED" th:selected="${status == 'REJECTED'}">REJECTED</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label text-secondary text-sm">Fuel Type</label>
+                        <select name="fuelTypeId" class="form-select form-glass">
+                            <option value="">-- All Fuels --</option>
+                            <option th:each="fuel : ${fuelTypes}" th:value="${fuel.id}" th:text="${fuel.name}" th:selected="${fuelTypeId == fuel.id}"></option>
+                        </select>
+                    </div>
+                    <div class="col-md-3 d-flex align-items-end gap-2">
+                        <button type="submit" class="btn btn-primary-gradient w-100"><i class="bi bi-search me-1"></i> Apply</button>
+                        <a th:href="@{/admin/orders}" class="btn btn-outline-secondary w-100"><i class="bi bi-arrow-clockwise me-1"></i> Reset</a>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Orders Results List -->
+            <div class="glass-card">
+                <div th:if="${orderPage.isEmpty()}" class="text-center py-5 text-secondary">
+                    <i class="bi bi-inbox fs-1 mb-3 d-block text-muted"></i>
+                    No orders registry found.
+                </div>
+
+                <div th:if="${!orderPage.isEmpty()}" class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead>
+                            <tr>
+                                <th>Order ID</th>
+                                <th>Customer</th>
+                                <th>Fuel Station</th>
+                                <th>Fuel Details</th>
+                                <th>Billing</th>
+                                <th>Status</th>
+                                <th>Order Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="order : ${orderPage.content}">
+                                <td th:text="'#' + ${order.id}">#1</td>
+                                <td>
+                                    <strong th:text="${order.customer.fullName}">Customer Name</strong>
+                                    <span class="d-block text-xs text-muted" th:text="${order.customer.username}">customer1</span>
+                                </td>
+                                <td th:text="${order.provider.fullName}">Apex Fuels</td>
+                                <td>
+                                    <span class="badge bg-secondary" th:text="${order.fuelType.name}">Petrol</span>
+                                    <span th:if="${order.isEmergency}" class="badge bg-danger">EMERGENCY</span>
+                                    <span class="d-block text-xs text-muted" th:text="${#numbers.formatDecimal(order.quantityLiters, 1, 2)} + ' L'">30 L</span>
+                                </td>
+                                <td>
+                                    <strong th:text="'₹' + ${#numbers.formatDecimal(order.totalPrice, 1, 2)}">₹36.00</strong>
+                                    <span class="d-block text-xs text-muted" th:text="${order.paymentMethod} + ' (' + ${order.paymentStatus} + ')'">COD (PAID)</span>
+                                </td>
+                                <td>
+                                    <span class="status-badge" 
+                                          th:classappend="${order.status == 'CREATED' ? 'status-created' : 
+                                                           (order.status == 'ACCEPTED' ? 'status-accepted' : 
+                                                           (order.status == 'AGENT_ASSIGNED' ? 'status-assigned' : 
+                                                           (order.status == 'OUT_FOR_DELIVERY' ? 'status-delivery' : 
+                                                           (order.status == 'DELIVERED' ? 'status-delivered' : 
+                                                           (order.status == 'REVIEWED' ? 'status-delivered' : 'status-rejected')))))}"
+                                          th:text="${order.status}">
+                                        CREATED
+                                    </span>
+                                </td>
+                                <td th:text="${#temporals.format(order.createdAt, 'yyyy-MM-dd HH:mm')}">2026-06-10 10:30</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination Grid -->
+                <div th:if="${orderPage.totalPages > 1}" class="d-flex justify-content-between align-items-center mt-4">
+                    <span class="text-secondary text-sm" th:text="'Showing page ' + (${orderPage.number} + 1) + ' of ' + ${orderPage.totalPages}">Page 1 of 5</span>
+                    <nav>
+                        <ul class="pagination pagination-sm mb-0">
+                            <li class="page-item" th:classappend="${!orderPage.hasPrevious()} ? 'disabled' : ''">
+                                <a class="page-link" th:href="@{/admin/orders(page=${orderPage.number - 1}, status=${status}, fuelTypeId=${fuelTypeId}, customer=${customer})}">Previous</a>
+                            </li>
+                            <li class="page-item" th:each="i : ${#numbers.sequence(0, orderPage.totalPages - 1)}" th:classappend="${orderPage.number == i} ? 'active' : ''">
+                                <a class="page-link" th:href="@{/admin/orders(page=${i}, status=${status}, fuelTypeId=${fuelTypeId}, customer=${customer})}" th:text="${i + 1}">1</a>
+                            </li>
+                            <li class="page-item" th:classappend="${!orderPage.hasNext()} ? 'disabled' : ''">
+                                <a class="page-link" th:href="@{/admin/orders(page=${orderPage.number + 1}, status=${status}, fuelTypeId=${fuelTypeId}, customer=${customer})}">Next</a>
+                            </li>
+                        </ul>
+                    </nav>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div th:replace="~{layout/main :: footer}"></div>
+</body>
+</html>

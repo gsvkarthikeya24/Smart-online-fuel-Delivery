@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{layout/main :: header('Order History')}"></head>
+<body>
+
+<div class="app-container">
+    <!-- Sidebar -->
+    <div th:replace="~{layout/main :: sidebar('history')}"></div>
+
+    <div class="main-wrapper">
+        <!-- Top Navbar -->
+        <div th:replace="~{layout/main :: navbar('Booking History')}"></div>
+
+        <!-- Main Content -->
+        <div class="container-fluid p-4 animate-fade-in">
+            <div class="glass-card">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h5 class="fw-bold mb-0"><i class="bi bi-clock-history me-2 text-primary"></i>All Orders Logs</h5>
+                    <a th:href="@{/customer/order-fuel}" class="btn btn-primary-gradient btn-sm"><i class="bi bi-plus-lg me-1"></i>New Booking</a>
+                </div>
+
+                <div th:if="${orderPage.isEmpty()}" class="text-center py-5 text-secondary">
+                    <i class="bi bi-journal-x fs-1 mb-3 d-block text-muted"></i>
+                    No orders logs found. Start booking fuel!
+                </div>
+
+                <div th:if="${!orderPage.isEmpty()}" class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead>
+                            <tr>
+                                <th>Order ID</th>
+                                <th>Date Placed</th>
+                                <th>Fuel Details</th>
+                                <th>Billing</th>
+                                <th>Delivery Agent</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="order : ${orderPage.content}">
+                                <td th:text="'#' + ${order.id}">#12</td>
+                                <td th:text="${#temporals.format(order.createdAt, 'yyyy-MM-dd HH:mm')}">2026-06-10 10:30</td>
+                                <td>
+                                    <span class="badge bg-secondary" th:text="${order.fuelType.name}">Petrol</span>
+                                    <span class="d-block text-xs text-muted" th:text="${#numbers.formatDecimal(order.quantityLiters, 1, 2)} + ' L'">30 L</span>
+                                </td>
+                                <td>
+                                    <strong th:text="'₹' + ${#numbers.formatDecimal(order.totalPrice, 1, 2)}">₹45.00</strong>
+                                    <span class="d-block text-xs text-muted" th:text="${order.paymentMethod}">UPI</span>
+                                </td>
+                                <td th:text="${order.agent != null ? order.agent.fullName : 'Not Assigned'}">Agent Name</td>
+                                <td>
+                                    <span class="status-badge" 
+                                          th:classappend="${order.status == 'CREATED' ? 'status-created' : 
+                                                           (order.status == 'ACCEPTED' ? 'status-accepted' : 
+                                                           (order.status == 'AGENT_ASSIGNED' ? 'status-assigned' : 
+                                                           (order.status == 'OUT_FOR_DELIVERY' ? 'status-delivery' : 
+                                                           (order.status == 'DELIVERED' ? 'status-delivered' : 
+                                                           (order.status == 'REVIEWED' ? 'status-delivered' : 'status-rejected')))))}"
+                                          th:text="${order.status}">
+                                        DELIVERED
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="d-flex gap-2">
+                                        <!-- Invoice PDF Download -->
+                                        <a th:href="@{/customer/invoice/{id}(id=${order.id})}" class="btn btn-sm btn-outline-success" title="Download PDF Invoice">
+                                            <i class="bi bi-file-earmark-pdf-fill"></i> Invoice
+                                        </a>
+                                        <!-- Leave Review (Only if DELIVERED) -->
+                                        <button th:if="${order.status == 'DELIVERED'}" 
+                                                class="btn btn-sm btn-outline-warning review-btn"
+                                                th:data-order-id="${order.id}"
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#reviewModal">
+                                            <i class="bi bi-star-fill"></i> Review
+                                        </button>
+                                        <!-- Tracking (If active) -->
+                                        <a th:if="${order.status != 'DELIVERED' && order.status != 'REVIEWED' && order.status != 'REJECTED'}" 
+                                           th:href="@{/customer/track-order/{id}(id=${order.id})}" 
+                                           class="btn btn-sm btn-outline-primary">
+                                            Track
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination Grid -->
+                <div th:if="${orderPage.totalPages > 1}" class="d-flex justify-content-between align-items-center mt-4">
+                    <span class="text-secondary text-sm" th:text="'Showing page ' + (${orderPage.number} + 1) + ' of ' + ${orderPage.totalPages}">Page 1 of 5</span>
+                    <nav>
+                        <ul class="pagination pagination-sm mb-0">
+                            <li class="page-item" th:classappend="${!orderPage.hasPrevious()} ? 'disabled' : ''">
+                                <a class="page-link" th:href="@{/customer/history(page=${orderPage.number - 1})}">Previous</a>
+                            </li>
+                            <li class="page-item" th:each="i : ${#numbers.sequence(0, orderPage.totalPages - 1)}" th:classappend="${orderPage.number == i} ? 'active' : ''">
+                                <a class="page-link" th:href="@{/customer/history(page=${i})}" th:text="${i + 1}">1</a>
+                            </li>
+                            <li class="page-item" th:classappend="${!orderPage.hasNext()} ? 'disabled' : ''">
+                                <a class="page-link" th:href="@{/customer/history(page=${orderPage.number + 1})}">Next</a>
+                            </li>
+                        </ul>
+                    </nav>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Star Rating Review Modal -->
+<div class="modal fade" id="reviewModal" tabindex="-1" aria-labelledby="reviewModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark text-white border border-light border-opacity-10 rounded-4">
+            <div class="modal-header border-bottom border-light border-opacity-10">
+                <h5 class="modal-title fw-bold" id="reviewModalLabel"><i class="bi bi-star-fill text-warning me-2"></i>Rate Fuel Service</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form th:action="@{/customer/review}" method="post">
+                <input type="hidden" name="orderId" id="modalOrderId">
+                <div class="modal-body">
+                    <!-- Star input choice -->
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Select Rating</label>
+                        <select name="rating" class="form-select form-glass" required>
+                            <option value="5">5 Stars - Outstanding Service</option>
+                            <option value="4">4 Stars - Very Good</option>
+                            <option value="3">3 Stars - Good / Standard</option>
+                            <option value="2">2 Stars - Poor</option>
+                            <option value="1">1 Star - Horrible Experience</option>
+                        </select>
+                    </div>
+                    <!-- Feedback input choice -->
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Write Comments</label>
+                        <textarea name="comment" class="form-control form-glass" rows="3" placeholder="Write feedback details here..." required></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer border-top border-light border-opacity-10">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="submit" class="btn btn-primary-gradient">Submit Review</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div th:replace="~{layout/main :: footer}"></div>
+
+<script>
+    document.querySelectorAll('.review-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const orderId = btn.getAttribute('th:data-order-id') || btn.getAttribute('data-order-id');
+            document.getElementById('modalOrderId').value = orderId;
+        });
+    });
+</script>
+
+</body>
+</html>

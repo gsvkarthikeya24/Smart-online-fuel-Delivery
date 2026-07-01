@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{layout/main :: header('Audit Logs')}"></head>
+<body>
+
+<div class="app-container">
+    <!-- Sidebar -->
+    <div th:replace="~{layout/main :: sidebar('logs')}"></div>
+
+    <div class="main-wrapper">
+        <!-- Top Navbar -->
+        <div th:replace="~{layout/main :: navbar('Operations Audit Trail')}"></div>
+
+        <!-- Main Content -->
+        <div class="container-fluid p-4 animate-fade-in">
+            <div class="glass-card">
+                <h5 class="fw-bold mb-4"><i class="bi bi-journal-text me-2 text-primary"></i>Audit Trails</h5>
+
+                <div th:if="${logs.isEmpty()}" class="text-center py-5 text-secondary">
+                    <i class="bi bi-journal-x fs-1 mb-3 d-block text-muted"></i>
+                    No audit records logged.
+                </div>
+
+                <div th:if="${!logs.isEmpty()}" class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>Operator</th>
+                                <th>Action Category</th>
+                                <th>Activity Details</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="log : ${logs}">
+                                <td th:text="${#temporals.format(log.timestamp, 'yyyy-MM-dd HH:mm:ss')}">2026-06-10 10:30:15</td>
+                                <td>
+                                    <strong th:text="${log.user != null ? log.user.fullName : 'System (Auto)'}">Admin User</strong>
+                                    <span class="d-block text-xs text-muted" th:text="${log.user != null ? log.user.username : 'cron'}">admin</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-secondary p-2" th:text="${log.action}">ORDER_PLACED</span>
+                                </td>
+                                <td th:text="${log.details}" class="text-xs text-muted" style="white-space: pre-wrap; max-width: 400px;">Details...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div th:replace="~{layout/main :: footer}"></div>
+</body>
+</html>

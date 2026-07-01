@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{layout/main :: header('Admin Dashboard')}"></head>
+<body>
+
+<div class="app-container">
+    <!-- Sidebar -->
+    <div th:replace="~{layout/main :: sidebar('dashboard')}"></div>
+
+    <div class="main-wrapper">
+        <!-- Top Navbar -->
+        <div th:replace="~{layout/main :: navbar('Admin System Dashboard')}"></div>
+
+        <!-- Main Content -->
+        <div class="container-fluid p-4 animate-fade-in">
+            
+            <!-- Dashboard KPIs -->
+            <div class="row g-4 mb-4">
+                <div class="col-md-3">
+                    <a href="/admin/orders" class="glass-card kpi-card text-decoration-none" style="cursor: pointer; display: block; transition: all 0.3s ease;">
+                        <div>
+                            <span class="text-secondary text-sm d-block mb-1">Total System Revenue</span>
+                            <h3 class="mb-0 fw-bold" th:text="'₹' + ${totalRevenue}">₹0.00</h3>
+                            <small class="text-muted" style="font-size: 0.75rem;">Simulated payments</small>
+                        </div>
+                        <div class="kpi-icon">
+                            <i class="bi bi-currency-rupee text-white"></i>
+                        </div>
+                    </a>
+                </div>
+                <div class="col-md-3">
+                    <a href="/admin/users" class="glass-card kpi-card text-decoration-none" style="cursor: pointer; display: block; transition: all 0.3s ease;">
+                        <div>
+                            <span class="text-secondary text-sm d-block mb-1">Customers Signed Up</span>
+                            <h3 class="mb-0 fw-bold" th:text="${customerCount}">0</h3>
+                            <small class="text-muted" style="font-size: 0.75rem;">Active accounts</small>
+                        </div>
+                        <div class="kpi-icon secondary">
+                            <i class="bi bi-people-fill"></i>
+                        </div>
+                    </a>
+                </div>
+                <div class="col-md-3">
+                    <a href="/admin/users" class="glass-card kpi-card text-decoration-none" style="cursor: pointer; display: block; transition: all 0.3s ease;">
+                        <div>
+                            <span class="text-secondary text-sm d-block mb-1">Fuel Providers</span>
+                            <h3 class="mb-0 fw-bold" th:text="${providerCount}">0</h3>
+                            <small class="text-muted" style="font-size: 0.75rem;">Stations onboard</small>
+                        </div>
+                        <div class="kpi-icon accent">
+                            <i class="bi bi-building-fill-gear"></i>
+                        </div>
+                    </a>
+                </div>
+                <div class="col-md-3">
+                    <a href="/admin/users" class="glass-card kpi-card text-decoration-none" style="cursor: pointer; display: block; transition: all 0.3s ease;">
+                        <div>
+                            <span class="text-secondary text-sm d-block mb-1">Delivery Drivers</span>
+                            <h3 class="mb-0 fw-bold" th:text="${agentCount}">0</h3>
+                            <small class="text-muted" style="font-size: 0.75rem;">Active fleets</small>
+                        </div>
+                        <div class="kpi-icon">
+                            <i class="bi bi-truck"></i>
+                        </div>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Chart Row -->
+            <div class="row g-4 mb-4">
+                <!-- 1. Fuel Type Sales -->
+                <div class="col-lg-4 col-md-6">
+                    <div class="glass-card h-100">
+                        <h6 class="fw-bold mb-3"><i class="bi bi-pie-chart-fill me-2 text-primary"></i>Sales by Fuel Type (Liters)</h6>
+                        <div class="position-relative" style="height: 250px;">
+                            <canvas id="fuelSalesChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Order Status distribution -->
+                <div class="col-lg-4 col-md-6">
+                    <div class="glass-card h-100">
+                        <h6 class="fw-bold mb-3"><i class="bi bi-bar-chart-line-fill me-2 text-success"></i>Orders Status Distribution</h6>
+                        <div class="position-relative" style="height: 250px;">
+                            <canvas id="statusDistributionChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Weekly Orders trends -->
+                <div class="col-lg-4 col-md-12">
+                    <div class="glass-card h-100">
+                        <h6 class="fw-bold mb-3"><i class="bi bi-graph-up me-2 text-warning"></i>Weekly Orders Trend</h6>
+                        <div class="position-relative" style="height: 250px;">
+                            <canvas id="weeklyTrendChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<div th:replace="~{layout/main :: footer}"></div>
+
+<!-- Chart initialization scripts -->
+<script th:inline="javascript">
+    /*<![CDATA[*/
+    document.addEventListener('DOMContentLoaded', () => {
+        // Parse data from model
+        const fuelLabels = /*[[${fuelLabels}]]*/ [];
+        const fuelData = /*[[${fuelData}]]*/ [];
+
+        const statusLabels = /*[[${statusLabels}]]*/ [];
+        const statusData = /*[[${statusData}]]*/ [];
+
+        const weeklyLabels = /*[[${weeklyLabels}]]*/ [];
+        const weeklyOrders = /*[[${weeklyOrders}]]*/ [];
+
+        // 1. Render Pie/Doughnut sales chart
+        if (fuelLabels.length > 0) {
+            window.createFuelChart('fuelSalesChart', 'doughnut', 'Liters Sold', fuelLabels, fuelData);
+        } else {
+            // Draw dummy chart if no data
+            window.createFuelChart('fuelSalesChart', 'doughnut', 'Liters Sold', ['No Data'], [1]);
+        }
+
+        // 2. Render Bar status chart
+        if (statusLabels.length > 0) {
+            window.createFuelChart('statusDistributionChart', 'bar', 'Orders Count', statusLabels, statusData);
+        } else {
+            window.createFuelChart('statusDistributionChart', 'bar', 'Orders Count', ['No Data'], [1]);
+        }
+
+        // 3. Render Weekly trend chart
+        window.createFuelChart('weeklyTrendChart', 'line', 'Orders Placed', weeklyLabels, weeklyOrders);
+    });
+    /*]]>*/
+</script>
+
+</body>
+</html>

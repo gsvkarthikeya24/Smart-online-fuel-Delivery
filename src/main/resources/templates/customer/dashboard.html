@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" lang="en">
+<head th:replace="~{layout/main :: header('Customer Dashboard')}"></head>
+<body>
+
+<div class="app-container">
+    <!-- Sidebar -->
+    <div th:replace="~{layout/main :: sidebar('dashboard')}"></div>
+
+    <div class="main-wrapper">
+        <!-- Top Navbar -->
+        <div th:replace="~{layout/main :: navbar('Customer Dashboard')}"></div>
+
+        <!-- Main Content Panel -->
+        <div class="container-fluid p-4 animate-fade-in">
+            <!-- Toast notification alerts -->
+            <div th:if="${param.ordered}" class="alert alert-success border-0 bg-success bg-opacity-10 text-success rounded-3 mb-4" role="alert">
+                <i class="bi bi-check-circle-fill me-2"></i> Fuel request placed successfully! Pending payment approval.
+            </div>
+            <div th:if="${param.reviewed}" class="alert alert-success border-0 bg-success bg-opacity-10 text-success rounded-3 mb-4" role="alert">
+                <i class="bi bi-check-circle-fill me-2"></i> Review submitted! Thank you for helping us maintain trust scores.
+            </div>
+
+            <!-- Dashboard Widgets Row -->
+            <div class="row g-4 mb-4">
+                <div class="col-md-3">
+                    <div class="glass-card kpi-card">
+                        <div>
+                            <span class="text-secondary text-sm d-block mb-1">Trust Level</span>
+                            <h3 class="mb-0 fw-bold" th:text="${customer.trustLevel}">BRONZE</h3>
+                            <small class="text-muted" style="font-size: 0.75rem;">Trust Score: <strong th:text="${customer.trustScore}">100</strong></small>
+                        </div>
+                        <div class="kpi-icon" th:classappend="${customer.trustLevel == 'PLATINUM' ? 'accent' : (customer.trustLevel == 'GOLD' ? 'secondary' : '')}">
+                            <i class="bi" th:classappend="${customer.trustLevel == 'BRONZE' ? 'bi-shield' : (customer.trustLevel == 'SILVER' ? 'bi-shield-shaded' : 'bi-shield-fill-check')}"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="glass-card kpi-card">
+                        <div>
+                            <span class="text-secondary text-sm d-block mb-1">Active Deliveries</span>
+                            <h3 class="mb-0 fw-bold" th:text="${activeOrders.size()}">0</h3>
+                            <small class="text-muted" style="font-size: 0.75rem;">Fuel requests in route</small>
+                        </div>
+                        <div class="kpi-icon secondary">
+                            <i class="bi bi-truck"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="glass-card kpi-card">
+                        <div>
+                            <span class="text-secondary text-sm d-block mb-1">Total Liters Purchased</span>
+                            <h3 class="mb-0 fw-bold" th:text="${totalLiters} + ' L'">0 L</h3>
+                            <small class="text-muted" style="font-size: 0.75rem;">Lifetime fuel volume</small>
+                        </div>
+                        <div class="kpi-icon accent">
+                            <i class="bi bi-droplet-fill"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="glass-card kpi-card">
+                        <div>
+                            <span class="text-secondary text-sm d-block mb-1">Total Fuel Expenses</span>
+                            <h3 class="mb-0 fw-bold" th:text="'₹' + ${totalSpent}">₹0.0</h3>
+                            <small class="text-muted" style="font-size: 0.75rem;">Simulated payments</small>
+                        </div>
+                        <div class="kpi-icon">
+                            <i class="bi bi-wallet2"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mid Section: Active Bookings & Prices -->
+            <div class="row g-4">
+                <!-- Active Bookings List -->
+                <div class="col-lg-8">
+                    <div class="glass-card h-100">
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <h5 class="mb-0 fw-bold"><i class="bi bi-clock-history me-2 text-primary"></i>Active Fuel Orders</h5>
+                            <a th:href="@{/customer/order-fuel}" class="btn btn-primary-gradient btn-sm"><i class="bi bi-plus-lg me-1"></i>New Booking</a>
+                        </div>
+                        
+                        <div th:if="${activeOrders.isEmpty()}" class="text-center py-5 text-secondary">
+                            <i class="bi bi-cart-x fs-1 mb-3 d-block text-muted"></i>
+                            No active fuel requests found. Order fuel to track your delivery here!
+                        </div>
+
+                        <div th:if="${!activeOrders.isEmpty()}" class="table-responsive">
+                            <table class="table table-hover align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>Order ID</th>
+                                        <th>Fuel Type</th>
+                                        <th>Quantity</th>
+                                        <th>Total Price</th>
+                                        <th>Status</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr th:each="order : ${activeOrders}">
+                                        <td th:text="'#' + ${order.id}">#1</td>
+                                        <td>
+                                            <span class="badge bg-secondary" th:text="${order.fuelType.name}">Petrol</span>
+                                            <span th:if="${order.isEmergency}" class="badge bg-danger">EMERGENCY</span>
+                                        </td>
+                                        <td th:text="${order.quantityLiters} + ' Liters'">20 Liters</td>
+                                        <td th:text="'₹' + ${order.totalPrice}">₹50.00</td>
+                                        <td>
+                                            <span class="status-badge" 
+                                                  th:classappend="${order.status == 'CREATED' ? 'status-created' : 
+                                                                   (order.status == 'ACCEPTED' ? 'status-accepted' : 
+                                                                   (order.status == 'AGENT_ASSIGNED' ? 'status-assigned' : 
+                                                                   (order.status == 'OUT_FOR_DELIVERY' ? 'status-delivery' : '')))}"
+                                                  th:text="${order.status}">
+                                                CREATED
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <div class="d-flex gap-2">
+                                                <a th:href="@{/customer/track-order/{id}(id=${order.id})}" class="btn btn-sm btn-outline-primary"><i class="bi bi-geo-alt-fill"></i> Track</a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Daily Prices -->
+                <div class="col-lg-4">
+                    <div class="glass-card h-100">
+                        <h5 class="mb-4 fw-bold"><i class="bi bi-tag-fill me-2 text-warning"></i>Fuel Price List</h5>
+                        <div class="list-group list-group-flush">
+                            <div th:each="price : ${fuelPrices}" class="list-group-item bg-transparent d-flex justify-content-between align-items-center py-3 border-bottom border-light border-opacity-10">
+                                <div>
+                                    <h6 class="mb-0 fw-semibold text-primary" th:text="${price.name}">Petrol</h6>
+                                    <small class="text-muted" th:text="${price.description}">Base Fuel</small>
+                                </div>
+                                <span class="badge bg-success bg-opacity-10 text-success p-2 fs-6 fw-bold" th:text="'₹' + ${price.basePricePerLiter} + '/L'">₹1.20/L</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+        </div>
+    </div>
+</div>
+
+<div th:replace="~{layout/main :: footer}"></div>
+</body>
+</html>

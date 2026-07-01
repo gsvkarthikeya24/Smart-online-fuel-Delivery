@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <th:block th:replace="~{layout/main :: header('Order Fuel')}"></th:block>
+
+    <link rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
+</head>
+
+<body>
+
+<div class="app-container">
+    <!-- Sidebar -->
+    <div th:replace="~{layout/main :: sidebar('order-fuel')}"></div>
+
+    <div class="main-wrapper">
+        <!-- Top Navbar -->
+        <div th:replace="~{layout/main :: navbar('Request Fuel Delivery')}"></div>
+
+        <!-- Main Content -->
+        <div class="container-fluid p-4 animate-fade-in">
+            <div class="row justify-content-center">
+                <div class="col-lg-8">
+                    <div class="glass-card">
+                        <h4 class="mb-4 fw-bold text-primary"><i class="bi bi-cart-plus-fill me-2"></i>Book Fuel Delivery</h4>
+                        
+                        <form th:action="@{/customer/order-fuel}" method="post" id="fuelOrderForm">
+                        <input type="hidden" name="latitude" id="latitude">
+                        <input type="hidden" name="longitude" id="longitude">
+                            <div class="row">
+                                <!-- Fuel Type selection -->
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-semibold">Select Fuel Type</label>
+                                    <select name="fuelTypeId" id="fuelTypeSelect" class="form-select form-glass" required>
+                                        <option value="" disabled selected>-- Select Fuel --</option>
+                                        <option th:each="fuel : ${fuelTypes}" 
+                                                th:value="${fuel.id}" 
+                                                th:data-price="${fuel.basePricePerLiter}"
+                                                th:text="${fuel.name + ' (₹' + fuel.basePricePerLiter + '/L)'}">
+                                            Petrol (₹1.20/L)
+                                        </option>
+                                    </select>
+                                </div>
+
+                                <!-- Fuel Provider selection -->
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-semibold">Select Fuel Station / Provider</label>
+                                    <div class="d-flex gap-2">
+                                        <select name="providerId" id="providerSelect" class="form-select form-glass" required>
+                                            <option value="" disabled selected>-- Select Station --</option>
+                                            <option th:each="prov : ${providers}" 
+                                                    th:value="${prov.id}" 
+                                                    th:text="${prov.fullName} + ' (' + ${prov.address} + ')'">
+                                                Apex Station (Downtown)
+                                            </option>
+                                        </select>
+                                        <button type="button" class="btn btn-outline-primary btn-sm" id="nearbyBtn" title="Find nearby fuel providers">
+                                            <i class="bi bi-geo-alt-fill"></i>
+                                        </button>
+                                    </div>
+                                    <small class="text-muted d-block mt-2">Click the location button to find nearby fuel stations.</small>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <!-- Quantity selection -->
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-semibold">Quantity (Liters)</label>
+                                    <input type="number" name="quantity" id="quantityInput" class="form-control form-glass" placeholder="e.g. 20" min="5" max="250" required>
+                                    <small class="text-muted">Minimum 5L, Maximum 250L per order</small>
+                                </div>
+
+                                <!-- Payment selection -->
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-semibold">Payment Method</label>
+                                    <select name="paymentMethod" class="form-select form-glass" required>
+                                        <option value="CARD">Debit/Credit Card Simulation</option>
+                                        <option value="UPI">UPI Simulation (GPay/PhonePe)</option>
+                                        <option value="COD">Cash On Delivery (COD)</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Delivery location with saved address -->
+                            <div class="mb-4">
+                                <label class="form-label fw-semibold">Delivery Address & Live Location Map</label>
+                                
+                                <!-- Map Container for showing current location and nearby fuel stations -->
+                                <div id="locationMap" style="height: 350px; border-radius: 12px; margin-bottom: 15px; border: 2px solid #e0e0e0;" class="mb-3"></div>
+                                
+                                <!-- Custom Address Input -->
+                                <div class="input-group mb-2">
+                                    <input type="text" name="deliveryAddress" id="deliveryAddressInput" class="form-control form-glass" placeholder="Enter drop-off address or click map" autocomplete="off" required>
+                                    <button class="btn btn-outline-primary" type="button" id="searchAddressBtn" title="Search address on map">
+                                        <i class="bi bi-search"></i> Search
+                                    </button>
+                                    <button class="btn btn-outline-primary" type="button" id="getCurrentLocationBtn" title="Use current location">
+                                        <i class="bi bi-geo-alt-fill"></i>
+                                    </button>
+                                </div>
+                                <small class="text-muted d-block" id="locationStatus"></small>
+                            </div>
+                            
+                            <!-- Nearby Providers Indicator -->
+                            <div class="mb-4 p-3 bg-info bg-opacity-10 border border-info border-opacity-25 rounded-3 d-none" id="nearbyProvidersIndicator">
+                                <i class="bi bi-info-circle text-info me-2"></i>
+                                <span id="nearbyProvidersText">Finding nearby fuel stations for your location...</span>
+                            </div>
+
+                            <!-- Emergency delivery checkbox -->
+                            <div class="mb-4 form-check bg-danger bg-opacity-10 border border-danger border-opacity-25 rounded-3 p-3 ps-5">
+                                <input class="form-check-input ms-0 me-3 mt-1" type="checkbox" name="isEmergency" value="true" id="emergencyCheck">
+                                <label class="form-check-label text-danger fw-semibold" for="emergencyCheck">
+                                    <i class="bi bi-lightning-charge-fill me-1"></i> Request Emergency Priority Dispatch (+15% Surcharge)
+                                </label>
+                                <small class="d-block text-danger opacity-75 text-xs">Priority dispatch maps delivery trucks directly to your location within 30 minutes.</small>
+                            </div>
+
+                            <!-- Real-time Cost Preview Widget -->
+                            <div class="card bg-secondary bg-opacity-10 border border-light border-opacity-10 rounded-4 p-4 mb-4">
+                                <h5 class="fw-bold mb-3">Cost Breakdown Summary</h5>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span class="text-secondary">Base Fuel Rate</span>
+                                    <span id="baseRatePreview">₹0.00 / L</span>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span class="text-secondary">Surcharge (Emergency)</span>
+                                    <span id="surchargePreview" class="text-danger">₹0.00</span>
+                                </div>
+                                <hr class="my-2 border-light border-opacity-10">
+                                <div class="d-flex justify-content-between">
+                                    <span class="fw-bold fs-5">Estimated Total Price</span>
+                                    <span id="totalPricePreview" class="fw-bold text-success fs-5">₹0.00</span>
+                                </div>
+                            </div>
+
+                            <div class="d-flex gap-3">
+                                <button type="submit" class="btn btn-primary-gradient px-4"><i class="bi bi-cart-check me-2"></i>Confirm and Order</button>
+                                <a th:href="@{/customer/dashboard}" class="btn btn-outline-secondary px-4">Cancel</a>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div th:replace="~{layout/main :: footer}"></div>
+
+<!-- Leaflet Map JavaScript -->
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js"></script>
+
+<script>
+    // Map initialization
+    let map = null;
+    let userMarker = null;
+    let providerMarkers = [];
+    let currentLocationCoords = {
+        lat: null,
+        lon: null
+    };
+    let locationReady = false;
+    let allFetchedProviders = [];
+
+    // Format address to show detailed present location (filtering out the word "mandal" and "India")
+    function formatAddress(data) {
+        if (!data) return '';
+        
+        let rawParts = [];
+        
+        // 1. Collect key address components if available
+        if (data.address) {
+            const addr = data.address;
+            
+            const building = addr.building || addr.house_number || addr.house_name || addr.amenity || addr.office || addr.shop;
+            if (building) rawParts.push(building);
+            
+            const road = addr.road || addr.street || addr.pedestrian || addr.path;
+            if (road) rawParts.push(road);
+            
+            const suburb = addr.neighbourhood || addr.suburb || addr.colony || addr.residential || addr.subdivision;
+            if (suburb) rawParts.push(suburb);
+            
+            const city = addr.village || addr.town || addr.city || addr.city_district || addr.municipality;
+            if (city) rawParts.push(city);
+            
+            const county = addr.county;
+            if (county) rawParts.push(county);
+            
+            const district = addr.district || addr.state_district;
+            if (district) rawParts.push(district);
+            
+            const state = addr.state;
+            if (state) rawParts.push(state);
+            
+            const postcode = addr.postcode;
+            if (postcode) rawParts.push(postcode);
+        } else if (data.display_name) {
+            // Fallback to display_name parts
+            rawParts = data.display_name.split(',');
+        }
+        
+        // 2. Clean each part: remove "mandal" as a separate word, trim, and filter out "India"
+        let cleanedParts = [];
+        rawParts.forEach(p => {
+            if (!p) return;
+            // Remove the word "mandal" (case insensitive) and extra spaces
+            let cleaned = p.replace(/\bmandal\b/gi, '').replace(/\s+/g, ' ').trim();
+            if (cleaned && !/india/i.test(cleaned)) {
+                cleanedParts.push(cleaned);
+            }
+        });
+        
+        // 3. Remove duplicates while preserving original order
+        let uniqueParts = [];
+        cleanedParts.forEach(p => {
+            if (!uniqueParts.includes(p)) {
+                uniqueParts.push(p);
+            }
+        });
+        
+        return uniqueParts.join(', ');
+    }
+
+
+    // Geocode helper: Convert address text to coordinates
+    function geocodeAddress(address, callback, errorCallback) {
+        if (!address || address.trim().length < 3) return;
+        
+        fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(address)}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data && data.length > 0) {
+                    const lat = parseFloat(data[0].lat);
+                    const lon = parseFloat(data[0].lon);
+                    callback(lat, lon);
+                } else {
+                    // Fallback: if the search fails, split by comma and try the first segment (e.g. "Maisammaguda")
+                    const parts = address.split(',');
+                    if (parts.length > 1 && parts[0].trim().length >= 3) {
+                        const fallbackAddress = parts[0].trim();
+                        fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(fallbackAddress)}`)
+                            .then(res => res.json())
+                            .then(fallbackData => {
+                                if (fallbackData && fallbackData.length > 0) {
+                                    const lat = parseFloat(fallbackData[0].lat);
+                                    const lon = parseFloat(fallbackData[0].lon);
+                                    callback(lat, lon);
+                                } else {
+                                    if (errorCallback) errorCallback("Address not found on map");
+                                }
+                            })
+                            .catch(err => {
+                                if (errorCallback) errorCallback(err.message);
+                            });
+                    } else {
+                        if (errorCallback) errorCallback("Address not found on map");
+                    }
+                }
+            })
+            .catch(error => {
+                console.error("Geocoding search error:", error);
+                if (errorCallback) errorCallback(error.message);
+            });
+    }
+
+    // Reverse Geocode helper: Convert coordinates to address text
+    function reverseGeocode(lat, lon, inputElement, statusElement) {
+        updateLocationCoords(lat, lon);
+        
+        if (statusElement) {
+            statusElement.innerHTML = `<span class="text-info"><i class="spinner-border spinner-border-sm me-1" role="status"></i> Resolving human-readable address...</span>`;
+        }
+        
+        fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`)
+            .then(response => response.json())
+            .then(data => {
+                const address = formatAddress(data) || `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+                inputElement.value = address;
+                
+                if (statusElement) {
+                    statusElement.innerHTML = `<span class="text-success"><i class="bi bi-check-circle-fill me-1"></i> Address resolved: ${address}</span>`;
+                }
+                
+                // Fetch nearby providers for the resolved location
+                fetchNearbyProvidersForCoords(lat, lon);
+            })
+            .catch(error => {
+                console.error('Geocoding error:', error);
+                const address = `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+                inputElement.value = address;
+                if (statusElement) {
+                    statusElement.innerHTML = `<span class="text-warning"><i class="bi bi-exclamation-circle me-1"></i> Location set: ${address}</span>`;
+                }
+                fetchNearbyProvidersForCoords(lat, lon);
+            });
+    }
+
+    // Update location coords across map, markers, and inputs
+    function updateLocationCoords(lat, lon) {
+        currentLocationCoords.lat = lat;
+        currentLocationCoords.lon = lon;
+        
+        const latInput = document.getElementById("latitude");
+        const lonInput = document.getElementById("longitude");
+        if (latInput) latInput.value = lat;
+        if (lonInput) lonInput.value = lon;
+        
+        locationReady = true;
+        updateUserMarkerOnMap();
+    }
+
+    // Initialize map on page load
+    window.addEventListener('DOMContentLoaded', function() {
+        initializeMap();
+        setupDeliveryAddressListener();
+        attemptGeolocation();
+    });
+
+    function initializeMap() {
+        const mapContainer = document.getElementById('locationMap');
+        if (!mapContainer) return;
+        
+        // Create map centered on user's default location or India center
+        map = L.map('locationMap').setView([20.5937, 78.9629], 5);
+        
+        // Add OpenStreetMap tiles
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors',
+            maxZoom: 19
+        }).addTo(map);
+        
+        updateUserMarkerOnMap();
+        
+        // Allow user to select location directly by clicking on the map
+        map.on('click', function(e) {
+            const lat = e.latlng.lat;
+            const lon = e.latlng.lng;
+            const deliveryInput = document.getElementById('deliveryAddressInput');
+            const statusEl = document.getElementById('locationStatus');
+            reverseGeocode(lat, lon, deliveryInput, statusEl);
+        });
+    }
+
+    function updateUserMarkerOnMap() {
+        if (!map) return;
+        if (currentLocationCoords.lat == null || currentLocationCoords.lon == null) {
+            return;
+        }
+        
+        if (userMarker) {
+            map.removeLayer(userMarker);
+        }
+        
+        // Add new user marker (blue color, styled)
+        userMarker = L.marker([currentLocationCoords.lat, currentLocationCoords.lon], {
+            icon: L.divIcon({
+                className: 'custom-user-pin',
+                html: `<div style="background-color: #0066cc; width: 22px; height: 22px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 0 10px rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center;">
+                         <div style="background-color: #fff; width: 6px; height: 6px; border-radius: 50%;"></div>
+                       </div>`,
+                iconSize: [22, 22],
+                iconAnchor: [11, 11]
+            })
+        }).addTo(map).bindPopup('📍 Your delivery location');
+        
+        // Center map on user location
+        map.setView([currentLocationCoords.lat, currentLocationCoords.lon], 13);
+    }
+
+    function attemptGeolocation() {
+        const deliveryInput = document.getElementById('deliveryAddressInput');
+        const statusEl = document.getElementById('locationStatus');
+        
+        if (statusEl) {
+            statusEl.innerHTML = `<span class="text-info"><i class="spinner-border spinner-border-sm me-1" role="status"></i> Querying device live location...</span>`;
+        }
+        
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    const lat = position.coords.latitude;
+                    const lon = position.coords.longitude;
+                    reverseGeocode(lat, lon, deliveryInput, statusEl);
+                },
+                function(error) {
+                    console.warn("Geolocation failed or denied, falling back to registered address geocoding.", error);
+                    fallbackToAddressGeocoding();
+                },
+                {
+                    timeout: 8000,
+                    enableHighAccuracy: false
+                }
+            );
+        } else {
+            fallbackToAddressGeocoding();
+        }
+    }
+
+    function fallbackToAddressGeocoding() {
+        const deliveryInput = document.getElementById('deliveryAddressInput');
+        const statusEl = document.getElementById('locationStatus');
+        const address = deliveryInput ? deliveryInput.value.trim() : '';
+        
+        if (address.length > 0) {
+            if (statusEl) {
+                statusEl.innerHTML = `<span class="text-info"><i class="spinner-border spinner-border-sm me-1" role="status"></i> Loading nearby stations for registered address...</span>`;
+            }
+            geocodeAddress(address, 
+                function(lat, lon) {
+                    updateLocationCoords(lat, lon);
+                    if (statusEl) {
+                        statusEl.innerHTML = `<span class="text-success"><i class="bi bi-check-circle-fill me-1"></i> Location located: ${address}</span>`;
+                    }
+                    fetchNearbyProvidersForCoords(lat, lon);
+                },
+                function(err) {
+                    showNoLocationSelected();
+                }
+            );
+        } else {
+            showNoLocationSelected();
+        }
+    }
+    
+    function showNoLocationSelected() {
+        const statusEl = document.getElementById('locationStatus');
+        if (statusEl) {
+            statusEl.innerHTML = `<span class="text-warning"><i class="bi bi-exclamation-circle me-1"></i> Live location unavailable. Please search your address or click on the map.</span>`;
+        }
+    }
+
+    function calculateDeliveryTime(distance) {
+        // Assume 30 km/h average travel speed (2 mins per km) + 5 minutes dispatch preparation time
+        return Math.round(distance * 2) + 5;
+    }
+
+    function applyProvidersFilter() {
+        const maxMinutes = 20;
+        const filtered = allFetchedProviders.filter(p => calculateDeliveryTime(p.distance) <= maxMinutes);
+        
+        displayNearbyProvidersInDropdown(filtered);
+        displayProvidersOnMap(filtered);
+        
+        const textEl = document.getElementById('nearbyProvidersText');
+        if (textEl) {
+            if (filtered.length === 0) {
+                textEl.innerHTML = `<span class="text-danger"><i class="bi bi-exclamation-triangle-fill me-1"></i> No fuel stations can deliver within 20 minutes to this location. Please choose another location.</span>`;
+            } else {
+                textEl.textContent = `✅ Found ${filtered.length} nearby fuel stations (delivering within 20 mins)`;
+            }
+        }
+    }
+
+    function fetchNearbyProvidersForCoords(lat, lon) {
+        if (!lat || !lon) return;
+        
+        const indicator = document.getElementById('nearbyProvidersIndicator');
+        const textEl = document.getElementById('nearbyProvidersText');
+        
+        if (indicator && textEl) {
+            indicator.classList.remove('d-none');
+            textEl.textContent = '🔍 Finding nearby fuel stations for your location...';
+        }
+        
+        // Use a larger radius (5000 km) to find all active database stations and compute their actual distances
+        const radius = 5000;
+        
+        fetch(`/customer/api/nearby-providers?lat=${lat}&lon=${lon}&radius=${radius}`)
+            .then(response => response.json())
+            .then(data => {
+                allFetchedProviders = data;
+                applyProvidersFilter();
+            })
+            .catch(error => {
+                console.error('Error fetching nearby providers:', error);
+                if (textEl) {
+                    textEl.textContent = '❌ Error finding nearby stations. Please try again.';
+                }
+            });
+    }
+
+    function displayProvidersOnMap(providers) {
+        if (!map) return;
+        
+        // Remove existing provider markers
+        providerMarkers.forEach(marker => map.removeLayer(marker));
+        providerMarkers = [];
+        
+        if (!providers || providers.length === 0) {
+            return;
+        }
+        
+        // Add provider markers (red color)
+        providers.forEach((provider) => {
+            const lat = provider.latitude || provider.lat;
+            const lon = provider.longitude || provider.lon;
+            if (!lat || !lon) return;
+
+            const estTime = calculateDeliveryTime(provider.distance);
+            const marker = L.circleMarker([lat, lon], {
+                radius: 10,
+                fillColor: '#ff4444',
+                color: '#fff',
+                weight: 2,
+                opacity: 1,
+                fillOpacity: 0.7
+            }).addTo(map).bindPopup(`
+                <div style="font-size: 12px; color: #333;">
+                    <strong>${provider.name}</strong><br>
+                    Distance: ${provider.distance ? provider.distance.toFixed(1) : '0'} km<br>
+                    Est. Delivery: ⏱️ ${estTime} mins<br>
+                    ${provider.address}
+                </div>
+            `);
+            
+            providerMarkers.push(marker);
+        });
+        
+        // Fit map bounds to show close markers (within 150 km) or center on user pin
+        if (providerMarkers.length > 0) {
+            const closeMarkers = providerMarkers.filter((m, index) => {
+                const p = providers[index];
+                return p && p.distance <= 150;
+            });
+            
+            if (closeMarkers.length > 0) {
+                const group = new L.featureGroup([userMarker, ...closeMarkers].filter(m => m != null));
+                map.fitBounds(group.getBounds().pad(0.1));
+            } else if (userMarker) {
+                map.setView(userMarker.getLatLng(), 13);
+            }
+        }
+    }
+
+    function displayNearbyProvidersInDropdown(providers) {
+        const providerSelect = document.getElementById('providerSelect');
+        if (!providerSelect) return;
+        
+        // Clear existing options except the first one
+        while (providerSelect.options.length > 1) {
+            providerSelect.remove(1);
+        }
+        
+        if (providers && providers.length > 0) {
+            // Sort by distance (closest first)
+            providers.sort((a, b) => (a.distance || 0) - (b.distance || 0));
+            
+            // Add nearby providers
+            providers.forEach((provider) => {
+                const option = document.createElement('option');
+                option.value = provider.id;
+                const estTime = calculateDeliveryTime(provider.distance);
+                const distStr = provider.distance ? `(${provider.distance.toFixed(1)} km) - ⏱️ ${estTime} mins` : '';
+                option.textContent = `${provider.name} ${distStr} - ${provider.address}`;
+                option.dataset.distance = provider.distance;
+                providerSelect.appendChild(option);
+            });
+            
+            // Auto-select the first (closest) provider
+            providerSelect.value = providers[0].id;
+            
+            // Change label to show it's auto-populated
+            const label = document.querySelector('label[for="providerSelect"]');
+            if (label) {
+                if (providers[0].distance <= 5) {
+                    label.innerHTML = '✅ Select Fuel Station / Provider <span class="text-success">(Nearby - Delivery within 15 mins)</span>';
+                } else if (providers[0].distance <= 10) {
+                    label.innerHTML = '✅ Select Fuel Station / Provider <span class="text-info">(Delivery within 25 mins)</span>';
+                } else {
+                    label.innerHTML = '✅ Select Fuel Station / Provider <span class="text-warning">(Showing Closest)</span>';
+                }
+            }
+        }
+    }
+
+    // Handle "Use Current Location" button
+    document.getElementById('getCurrentLocationBtn')?.addEventListener('click', function(e) {
+        e.preventDefault();
+        const deliveryInput = document.getElementById('deliveryAddressInput');
+        const statusEl = document.getElementById('locationStatus');
+        
+        if (navigator.geolocation) {
+            if (statusEl) {
+                statusEl.innerHTML = `<span class="text-info"><i class="spinner-border spinner-border-sm me-1" role="status"></i> Querying device GPS/Wi-Fi location...</span>`;
+            }
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    const lat = position.coords.latitude;
+                    const lon = position.coords.longitude;
+                    const accuracy = position.coords.accuracy || 0;
+                    
+                    if (statusEl) {
+                        statusEl.innerHTML = `<span class="text-info"><i class="spinner-border spinner-border-sm me-1" role="status"></i> Coordinates found (accuracy: ${Math.round(accuracy)}m). Resolving address...</span>`;
+                    }
+                    reverseGeocode(lat, lon, deliveryInput, statusEl);
+                },
+                function(error) {
+                    console.error('Geolocation error:', error);
+                    let errorMsg = "Geolocation failed.";
+                    if (error.code === error.PERMISSION_DENIED) {
+                        errorMsg = "Permission Denied: Please allow location access in your browser's site settings (usually the lock icon in the address bar).";
+                    } else if (error.code === error.POSITION_UNAVAILABLE) {
+                        errorMsg = "Position Unavailable: Your device cannot determine its physical location (e.g. no GPS/Wi-Fi card). Try typing your address manually or clicking on the map.";
+                    } else if (error.code === error.TIMEOUT) {
+                        errorMsg = "Timeout: Took too long to get location. Try again or select location on the map.";
+                    }
+                    
+                    if (statusEl) {
+                        statusEl.innerHTML = `<span class="text-danger"><i class="bi bi-exclamation-triangle-fill me-1"></i> ${errorMsg}</span>`;
+                    }
+                    fallbackToAddressGeocoding();
+                },
+                {
+                    timeout: 10000,
+                    enableHighAccuracy: true
+                }
+            );
+        } else {
+            if (statusEl) {
+                statusEl.innerHTML = `<span class="text-danger"><i class="bi bi-exclamation-triangle-fill me-1"></i> Geolocation not supported by browser.</span>`;
+            }
+            fallbackToAddressGeocoding();
+        }
+    });
+
+    // Handle manual "Search" button
+    document.getElementById('searchAddressBtn')?.addEventListener('click', function(e) {
+        e.preventDefault();
+        const deliveryInput = document.getElementById('deliveryAddressInput');
+        const statusEl = document.getElementById('locationStatus');
+        const address = deliveryInput.value.trim();
+        
+        if (address.length >= 3) {
+            if (statusEl) {
+                statusEl.innerHTML = `<span class="text-info"><i class="spinner-border spinner-border-sm me-1" role="status"></i> Searching map for "${address}"...</span>`;
+            }
+            geocodeAddress(address,
+                function(lat, lon) {
+                    updateLocationCoords(lat, lon);
+                    if (statusEl) {
+                        statusEl.innerHTML = `<span class="text-success"><i class="bi bi-check-circle-fill me-1"></i> Located: ${lat.toFixed(4)}, ${lon.toFixed(4)}</span>`;
+                    }
+                    fetchNearbyProvidersForCoords(lat, lon);
+                },
+                function(err) {
+                    if (statusEl) {
+                        statusEl.innerHTML = `<span class="text-warning"><i class="bi bi-exclamation-circle me-1"></i> Could not locate "${address}". Try a simpler query.</span>`;
+                    }
+                }
+            );
+        }
+    });
+
+    // Setup delivery address input listener (with debounce)
+    function setupDeliveryAddressListener() {
+        const deliveryInput = document.getElementById('deliveryAddressInput');
+        if (!deliveryInput) return;
+
+        let debounceTimer;
+        deliveryInput.addEventListener('input', function() {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                const address = deliveryInput.value.trim();
+                if (address.length >= 3) {
+                    const statusEl = document.getElementById('locationStatus');
+                    if (statusEl) {
+                        statusEl.innerHTML = `<span class="text-info"><i class="spinner-border spinner-border-sm me-1" role="status"></i> Locating address on map...</span>`;
+                    }
+                    geocodeAddress(address,
+                        function(lat, lon) {
+                            updateLocationCoords(lat, lon);
+                            if (statusEl) {
+                                statusEl.innerHTML = `<span class="text-success"><i class="bi bi-check-circle-fill me-1"></i> Located: ${lat.toFixed(4)}, ${lon.toFixed(4)}</span>`;
+                            }
+                            fetchNearbyProvidersForCoords(lat, lon);
+                        },
+                        function(err) {
+                            if (statusEl) {
+                                statusEl.innerHTML = `<span class="text-warning"><i class="bi bi-exclamation-circle me-1"></i> Could not locate typed address.</span>`;
+                            }
+                        }
+                    );
+                }
+            }, 800);
+        });
+    }
+
+    // Modal search functionality
+    document.getElementById('nearbyBtn')?.addEventListener('click', function() {
+        const modal = new bootstrap.Modal(document.getElementById('nearbyProvidersModal'));
+        modal.show();
+        
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        const providersList = document.getElementById('providersList');
+        const errorMessage = document.getElementById('errorMessage');
+        
+        if (loadingSpinner) loadingSpinner.style.display = 'block';
+        if (providersList) providersList.style.display = 'none';
+        if (errorMessage) errorMessage.classList.add('d-none');
+        
+        const lat = currentLocationCoords.lat || 17.5615;
+        const lon = currentLocationCoords.lon || 78.4522;
+        
+        fetchNearbyProviders(lat, lon);
+    });
+
+    function fetchNearbyProviders(lat, lon) {
+        const radius = 5000;
+        fetch(`/customer/api/nearby-providers?lat=${lat}&lon=${lon}&radius=${radius}`)
+            .then(response => response.json())
+            .then(data => {
+                const maxMinutes = 20;
+                const filtered = data.filter(p => calculateDeliveryTime(p.distance) <= maxMinutes);
+                displayNearbyProvidersInModal(filtered);
+            })
+            .catch(error => {
+                showError('Error fetching nearby providers: ' + error.message);
+            });
+    }
+
+    function displayNearbyProvidersInModal(providers) {
+        const providersList = document.getElementById('providersList');
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        const errorMessage = document.getElementById('errorMessage');
+        
+        if (loadingSpinner) loadingSpinner.style.display = 'none';
+        if (errorMessage) errorMessage.classList.add('d-none');
+        
+        if (!providers || providers.length === 0) {
+            providersList.innerHTML = '<div class="alert alert-info">No fuel providers found in the system.</div>';
+            providersList.style.display = 'block';
+            return;
+        }
+
+        // Sort by distance (closest first)
+        providers.sort((a, b) => (a.distance || 0) - (b.distance || 0));
+
+        let html = '<div class="list-group">';
+        providers.forEach(provider => {
+            const distStr = provider.distance ? `${provider.distance.toFixed(1)} km` : '';
+            const badgeClass = provider.distance <= 50 ? 'bg-primary' : 'bg-secondary';
+            html += `
+                <div class="list-group-item bg-dark border-light border-opacity-10 cursor-pointer" style="cursor: pointer;" 
+                     onclick="selectProvider(${provider.id}, '${provider.name}')">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h6 class="mb-1 text-white">
+                                <i class="bi bi-fuel-pump text-primary me-2"></i>${provider.name}
+                            </h6>
+                            <p class="text-secondary text-sm mb-0">${provider.address}</p>
+                        </div>
+                        <div class="text-right">
+                            <span class="badge ${badgeClass} fs-6">${distStr}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        html += '</div>';
+        
+        providersList.innerHTML = html;
+        providersList.style.display = 'block';
+    }
+
+    function selectProvider(providerId, providerName) {
+        document.getElementById('providerSelect').value = providerId;
+        
+        const modalEl = document.getElementById('nearbyProvidersModal');
+        const modal = bootstrap.Modal.getInstance(modalEl);
+        if (modal) modal.hide();
+        
+        const alert = document.createElement('div');
+        alert.className = 'alert alert-success alert-dismissible fade show mt-3';
+        alert.innerHTML = `<i class="bi bi-check-circle me-2"></i>Selected: <strong>${providerName}</strong><button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+        document.querySelector('.glass-card').insertBefore(alert, document.querySelector('form'));
+    }
+
+    function showError(message) {
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        const errorMessage = document.getElementById('errorMessage');
+        
+        if (loadingSpinner) loadingSpinner.style.display = 'none';
+        if (errorMessage) {
+            errorMessage.textContent = message;
+            errorMessage.classList.remove('d-none');
+        }
+    }
+
+    // Calculate total price preview
+    const fuelSelect = document.getElementById('fuelTypeSelect');
+    const quantityInput = document.getElementById('quantityInput');
+    const emergencyCheck = document.getElementById('emergencyCheck');
+    const baseRatePreview = document.getElementById('baseRatePreview');
+    const surchargePreview = document.getElementById('surchargePreview');
+    const totalPricePreview = document.getElementById('totalPricePreview');
+
+    function calculateTotal() {
+        const selectedOption = fuelSelect.options[fuelSelect.selectedIndex];
+        const basePriceAttr = selectedOption ? selectedOption.getAttribute('data-price') : null;
+        const basePrice = (basePriceAttr && !isNaN(parseFloat(basePriceAttr))) ? parseFloat(basePriceAttr) : 0;
+        const qty = parseFloat(quantityInput.value) || 0;
+        const isEmergency = emergencyCheck.checked;
+
+        // Update minimum limit dynamically based on fuel type selection
+        const selectedText = selectedOption ? selectedOption.text : '';
+        const quantityHelp = document.querySelector('#quantityInput + small');
+        if (selectedText.toLowerCase().includes('petrol')) {
+            quantityInput.min = '1';
+            if (quantityHelp) {
+                quantityHelp.textContent = 'Minimum 1L, Maximum 250L per order';
+            }
+        } else {
+            quantityInput.min = '5';
+            if (quantityHelp) {
+                quantityHelp.textContent = 'Minimum 5L, Maximum 250L per order';
+            }
+        }
+
+        if (basePrice > 0) {
+            baseRatePreview.textContent = '₹' + basePrice.toFixed(2) + ' / L';
+        } else {
+            baseRatePreview.textContent = '₹0.00 / L';
+        }
+
+        let subtotal = basePrice * qty;
+        let surcharge = 0;
+        if (isEmergency) {
+            surcharge = subtotal * 0.15;
+        }
+
+        surchargePreview.textContent = '₹' + surcharge.toFixed(2);
+        let total = subtotal + surcharge;
+        totalPricePreview.textContent = '₹' + total.toFixed(2);
+    }
+
+    if (fuelSelect) fuelSelect.addEventListener('change', calculateTotal);
+    if (quantityInput) quantityInput.addEventListener('input', calculateTotal);
+    if (emergencyCheck) emergencyCheck.addEventListener('change', calculateTotal);
+    calculateTotal();
+</script>
+
+ 
+ <!-- Nearby Providers Modal -->
+<div class="modal fade" id="nearbyProvidersModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content bg-dark border border-light border-opacity-25">
+            <div class="modal-header border-light border-opacity-25">
+                <h5 class="modal-title text-white">
+                    <i class="bi bi-geo-alt-fill text-primary me-2"></i>Nearby Fuel Stations
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="loadingSpinner" class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-3 text-secondary">Detecting your location and finding nearby providers...</p>
+                </div>
+                <div id="providersList" style="display: none;"></div>
+                <div id="errorMessage" class="alert alert-warning d-none" role="alert"></div>
+            </div>
+            <div class="modal-footer border-light border-opacity-25">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+</body>
+
+</html>

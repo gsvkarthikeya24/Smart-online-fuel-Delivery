@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{layout/main :: header('Manage Inventory')}"></head>
+<body>
+
+<div class="app-container">
+    <!-- Sidebar -->
+    <div th:replace="~{layout/main :: sidebar('inventory')}"></div>
+
+    <div class="main-wrapper">
+        <!-- Top Navbar -->
+        <div th:replace="~{layout/main :: navbar('Fuel Inventory Controls')}"></div>
+
+        <!-- Main Content -->
+        <div class="container-fluid p-4 animate-fade-in">
+            <div class="row g-4">
+                
+                <!-- Stock Levels Table -->
+                <div class="col-lg-7">
+                    <div class="glass-card h-100">
+                        <h5 class="fw-bold mb-4">Current Stock Levels</h5>
+                        <div class="table-responsive">
+                            <table class="table align-middle table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Fuel Type</th>
+                                        <th>Current Stock</th>
+                                        <th>Capacity</th>
+                                        <th>Alert Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr th:each="inv : ${inventory}">
+                                        <td class="fw-semibold text-primary" th:text="${inv.fuelType.name}">Petrol</td>
+                                        <td th:text="${#numbers.formatDecimal(inv.currentStockLiters, 1, 2)} + ' L'">4000L</td>
+                                        <td th:text="${#numbers.formatDecimal(inv.maxCapacityLiters, 1, 2)} + ' L'">5000L</td>
+                                        <td>
+                                            <span th:if="${inv.currentStockLiters < (inv.maxCapacityLiters * 0.15)}" class="badge bg-danger p-2"><i class="bi bi-bell-fill"></i> LOW STOCK</span>
+                                            <span th:if="${inv.currentStockLiters >= (inv.maxCapacityLiters * 0.15)}" class="badge bg-success p-2">STABLE</span>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Update Inventory Form -->
+                <div class="col-lg-5">
+                    <div class="glass-card">
+                        <h5 class="fw-bold mb-4">Adjust Stock Levels</h5>
+                        
+                        <div th:if="${param.success}" class="alert alert-success border-0 bg-success bg-opacity-10 text-success rounded-3 mb-4" role="alert">
+                            <i class="bi bi-check-circle-fill me-2"></i> Stock levels updated successfully.
+                        </div>
+
+                        <form th:action="@{/provider/inventory}" method="post">
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Select Fuel Type</label>
+                                <select name="fuelTypeId" class="form-select form-glass" required>
+                                    <option value="" disabled selected>-- Select Fuel --</option>
+                                    <option th:each="type : ${fuelTypes}" th:value="${type.id}" th:text="${type.name}"></option>
+                                </select>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">New Stock Level (Liters)</label>
+                                <input type="number" name="currentStock" class="form-control form-glass" placeholder="e.g. 3000" min="0" required>
+                            </div>
+
+                            <div class="mb-4">
+                                <label class="form-label fw-semibold">Max Tanker/Depot Capacity (Liters)</label>
+                                <input type="number" name="maxCapacity" class="form-control form-glass" placeholder="e.g. 5000" min="500" required>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary-gradient w-100"><i class="bi bi-arrow-repeat me-2"></i>Save Stock Updates</button>
+                        </form>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<div th:replace="~{layout/main :: footer}"></div>
+</body>
+</html>

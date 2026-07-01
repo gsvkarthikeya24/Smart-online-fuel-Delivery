@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{layout/main :: header('Profile Settings')}"></head>
+<body>
+
+<div class="app-container">
+    <!-- Sidebar -->
+    <div th:replace="~{layout/main :: sidebar('profile')}"></div>
+
+    <div class="main-wrapper">
+        <!-- Top Navbar -->
+        <div th:replace="~{layout/main :: navbar('Settings')}"></div>
+
+        <!-- Main Content -->
+        <div class="container-fluid p-4 animate-fade-in">
+            <div class="row justify-content-center">
+                <div class="col-lg-8">
+                    <div class="glass-card">
+                        <h4 class="mb-4 fw-bold text-primary"><i class="bi bi-person-fill-gear me-2"></i>Profile Settings</h4>
+
+                        <!-- Success message toast -->
+                        <div th:if="${param.success}" class="alert alert-success border-0 bg-success bg-opacity-10 text-success rounded-3 mb-4" role="alert">
+                            <i class="bi bi-check-circle-fill me-2"></i> Profile details updated successfully!
+                        </div>
+
+                        <form th:action="@{/customer/profile}" method="post">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label text-secondary">Username (Read-Only)</label>
+                                    <input type="text" th:value="${user.username}" class="form-control form-glass" readonly style="opacity: 0.65;">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label text-secondary">Account Trust Status</label>
+                                    <div class="form-control form-glass d-flex align-items-center justify-content-between" style="opacity: 0.85;">
+                                        <span class="fw-bold text-success" th:text="${user.trustLevel}">BRONZE</span>
+                                        <span class="text-muted" th:text="'Score: ' + ${user.trustScore}">Score: 100</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-semibold">Full Name</label>
+                                    <input type="text" name="fullName" th:value="${user.fullName}" class="form-control form-glass" required>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-semibold">Email Address</label>
+                                    <input type="email" name="email" th:value="${user.email}" class="form-control form-glass" required>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-12 mb-3">
+                                    <label class="form-label fw-semibold">Phone Number</label>
+                                    <input type="text" name="phoneNumber" th:value="${user.phoneNumber}" class="form-control form-glass" required>
+                                </div>
+                            </div>
+
+                            <div class="mb-4">
+                                <label class="form-label fw-semibold">Dropoff Address / Coordinates</label>
+                                <input type="text" name="address" th:value="${user.address}" class="form-control form-glass" required>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary-gradient px-4"><i class="bi bi-save me-2"></i>Save Adjustments</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div th:replace="~{layout/main :: footer}"></div>
+</body>
+</html>

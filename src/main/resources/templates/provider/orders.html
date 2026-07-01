@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{layout/main :: header('Operations Queue')}"></head>
+<body>
+
+<div class="app-container">
+    <!-- Sidebar -->
+    <div th:replace="~{layout/main :: sidebar('orders')}"></div>
+
+    <div class="main-wrapper">
+        <!-- Top Navbar -->
+        <div th:replace="~{layout/main :: navbar('Operations & Orders Panel')}"></div>
+
+        <!-- Main Content -->
+        <div class="container-fluid p-4 animate-fade-in">
+            <div class="glass-card">
+                <h5 class="fw-bold mb-4">Operations Queue</h5>
+
+                <!-- Messages -->
+                <div th:if="${param.error}" class="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger rounded-3 mb-4" role="alert">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i> <span th:text="${param.error}"></span>
+                </div>
+                <div th:if="${param.accepted}" class="alert alert-success border-0 bg-success bg-opacity-10 text-success rounded-3 mb-4" role="alert">
+                    <i class="bi bi-check-circle-fill me-2"></i> Order accepted and inventory stocks allocated.
+                </div>
+                <div th:if="${param.rejected}" class="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger rounded-3 mb-4" role="alert">
+                    <i class="bi bi-check-circle-fill me-2"></i> Order rejected.
+                </div>
+                <div th:if="${param.assigned}" class="alert alert-success border-0 bg-success bg-opacity-10 text-success rounded-3 mb-4" role="alert">
+                    <i class="bi bi-check-circle-fill me-2"></i> Delivery Agent successfully assigned to order.
+                </div>
+
+                <div th:if="${orderPage.isEmpty()}" class="text-center py-5 text-secondary">
+                    <i class="bi bi-inbox fs-1 mb-3 d-block text-muted"></i>
+                    No customer orders found.
+                </div>
+
+                <div th:if="${!orderPage.isEmpty()}" class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead>
+                            <tr>
+                                <th>Order ID</th>
+                                <th>Customer</th>
+                                <th>Fuel Details</th>
+                                <th>Address</th>
+                                <th>Billing</th>
+                                <th>Agent</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="order : ${orderPage.content}">
+                                <td th:text="'#' + ${order.id}">#1</td>
+                                <td>
+                                    <span class="fw-semibold" th:text="${order.customer.fullName}">Customer Name</span>
+                                    <span class="d-block text-xs text-muted" th:text="'Trust Level: ' + ${order.customer.trustLevel}">Bronze</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-secondary" th:text="${order.fuelType.name}">Petrol</span>
+                                    <span th:if="${order.isEmergency}" class="badge bg-danger">EMERGENCY</span>
+                                    <span class="d-block text-xs text-muted" th:text="${#numbers.formatDecimal(order.quantityLiters, 1, 2)} + ' L'">20 L</span>
+                                </td>
+                                <td th:text="${order.deliveryAddress}" class="text-truncate" style="max-width: 150px;">123 St</td>
+                                <td>
+                                    <strong th:text="'₹' + ${#numbers.formatDecimal(order.totalPrice, 1, 2)}">₹30.00</strong>
+                                    <span class="d-block text-xs text-muted" th:text="${order.paymentMethod} + ' (' + ${order.paymentStatus} + ')'">CARD (PAID)</span>
+                                </td>
+                                <td>
+                                    <span th:if="${order.agent != null}" th:text="${order.agent.fullName}">Agent Name</span>
+                                    <span th:if="${order.agent == null}" class="text-muted text-xs">Unassigned</span>
+                                </td>
+                                <td>
+                                    <span class="status-badge" 
+                                          th:classappend="${order.status == 'CREATED' ? 'status-created' : 
+                                                           (order.status == 'ACCEPTED' ? 'status-accepted' : 
+                                                           (order.status == 'AGENT_ASSIGNED' ? 'status-assigned' : 
+                                                           (order.status == 'OUT_FOR_DELIVERY' ? 'status-delivery' : 
+                                                           (order.status == 'DELIVERED' ? 'status-delivered' : 
+                                                           (order.status == 'REVIEWED' ? 'status-delivered' : 'status-rejected')))))}"
+                                          th:text="${order.status}">
+                                        CREATED
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="d-flex gap-2">
+                                        <!-- Actions for CREATED orders -->
+                                        <form th:if="${order.status == 'CREATED'}" th:action="@{/provider/order/accept}" method="post">
+                                            <input type="hidden" name="orderId" th:value="${order.id}">
+                                            <button type="submit" class="btn btn-sm btn-success" title="Accept Request"><i class="bi bi-check-lg"></i></button>
+                                        </form>
+                                        <form th:if="${order.status == 'CREATED'}" th:action="@{/provider/order/reject}" method="post">
+                                            <input type="hidden" name="orderId" th:value="${order.id}">
+                                            <button type="submit" class="btn btn-sm btn-danger" title="Reject Request"><i class="bi bi-x-lg"></i></button>
+                                        </form>
+
+                                        <!-- Assign Agent Form for ACCEPTED orders -->
+                                        <form th:if="${order.status == 'ACCEPTED'}" th:action="@{/provider/order/assign-agent}" method="post" class="d-flex align-items-center gap-1">
+                                            <input type="hidden" name="orderId" th:value="${order.id}">
+                                            <select name="agentId" class="form-select form-select-sm form-glass" required style="width: 130px;">
+                                                <option value="" disabled selected>-- Agent --</option>
+                                                <option th:each="agent : ${agents}" th:value="${agent.id}" th:text="${agent.fullName}"></option>
+                                            </select>
+                                            <button type="submit" class="btn btn-sm btn-primary-gradient"><i class="bi bi-send-fill"></i></button>
+                                        </form>
+                                        
+                                        <span th:if="${order.status != 'CREATED' && order.status != 'ACCEPTED'}" class="text-secondary text-xs">No Action</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination Grid -->
+                <div th:if="${orderPage.totalPages > 1}" class="d-flex justify-content-between align-items-center mt-4">
+                    <span class="text-secondary text-sm" th:text="'Showing page ' + (${orderPage.number} + 1) + ' of ' + ${orderPage.totalPages}">Page 1 of 5</span>
+                    <nav>
+                        <ul class="pagination pagination-sm mb-0">
+                            <li class="page-item" th:classappend="${!orderPage.hasPrevious()} ? 'disabled' : ''">
+                                <a class="page-link" th:href="@{/provider/orders(page=${orderPage.number - 1})}">Previous</a>
+                            </li>
+                            <li class="page-item" th:each="i : ${#numbers.sequence(0, orderPage.totalPages - 1)}" th:classappend="${orderPage.number == i} ? 'active' : ''">
+                                <a class="page-link" th:href="@{/provider/orders(page=${i})}" th:text="${i + 1}">1</a>
+                            </li>
+                            <li class="page-item" th:classappend="${!orderPage.hasNext()} ? 'disabled' : ''">
+                                <a class="page-link" th:href="@{/provider/orders(page=${orderPage.number + 1})}">Next</a>
+                            </li>
+                        </ul>
+                    </nav>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div th:replace="~{layout/main :: footer}"></div>
+</body>
+</html>

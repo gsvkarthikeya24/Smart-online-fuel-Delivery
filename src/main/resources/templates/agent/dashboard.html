@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{layout/main :: header('Agent Dashboard')}"></head>
+<body>
+
+<div class="app-container">
+    <!-- Sidebar -->
+    <div th:replace="~{layout/main :: sidebar('dashboard')}"></div>
+
+    <div class="main-wrapper">
+        <!-- Top Navbar -->
+        <div th:replace="~{layout/main :: navbar('Agent Operations Dashboard')}"></div>
+
+        <!-- Main Content -->
+        <div class="container-fluid p-4 animate-fade-in">
+            
+            <!-- Toast notification messages -->
+            <div th:if="${param.error}" class="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger rounded-4 p-3 mb-4" role="alert">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i> <span th:text="${param.error}"></span>
+            </div>
+            <div th:if="${param.accepted}" class="alert alert-success border-0 bg-success bg-opacity-10 text-success rounded-4 p-3 mb-4" role="alert">
+                <i class="bi bi-check-circle-fill me-2"></i> Order accepted! Proceed to dispatcher station and update status to OUT_FOR_DELIVERY.
+            </div>
+            <div th:if="${param.delivered}" class="alert alert-success border-0 bg-success bg-opacity-10 text-success rounded-4 p-3 mb-4" role="alert">
+                <i class="bi bi-patch-check-fill me-2 text-primary"></i> Order verified and marked as Delivered! Trust scores updated.
+            </div>
+
+            <!-- KPI Cards -->
+            <div class="row g-4 mb-4">
+                <div class="col-md-3">
+                    <div class="glass-card kpi-card">
+                        <div>
+                            <span class="text-secondary text-sm d-block mb-1">Completed Jobs</span>
+                            <h3 class="mb-0 fw-bold" th:text="${completedCount}">0</h3>
+                            <small class="text-muted" style="font-size: 0.75rem;">Verified drop-offs</small>
+                        </div>
+                        <div class="kpi-icon">
+                            <i class="bi bi-patch-check-fill"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="glass-card kpi-card">
+                        <div>
+                            <span class="text-secondary text-sm d-block mb-1">Total Assigned</span>
+                            <h3 class="mb-0 fw-bold" th:text="${totalDeliveries}">0</h3>
+                            <small class="text-muted" style="font-size: 0.75rem;">All tasks assigned</small>
+                        </div>
+                        <div class="kpi-icon secondary">
+                            <i class="bi bi-card-checklist"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="glass-card kpi-card">
+                        <div class="w-100">
+                            <span class="text-secondary text-sm d-block mb-1">Assigned Transport Vehicle Details</span>
+                            <div class="d-flex justify-content-between align-items-center mt-2">
+                                <div>
+                                    <h5 class="mb-0 fw-bold text-primary" th:text="${agentProfile != null ? agentProfile.vehicleType : 'N/A'}">Fuel Tanker</h5>
+                                    <small class="text-muted" th:text="'License Plate: ' + ${agentProfile != null ? agentProfile.vehicleNumber : 'N/A'}">NY-987-AB</small>
+                                </div>
+                                <span class="badge bg-success bg-opacity-10 text-success p-2" th:text="${agentProfile != null ? agentProfile.status : 'AVAILABLE'}">AVAILABLE</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Active Jobs Queue -->
+            <div class="glass-card">
+                <h5 class="fw-bold mb-4"><i class="bi bi-truck me-2 text-primary"></i>Active Shipments Queue</h5>
+                
+                <div th:if="${activeDeliveries.isEmpty()}" class="text-center py-5 text-secondary">
+                    <i class="bi bi-emoji-smile fs-1 mb-3 d-block text-muted"></i>
+                    No pending delivery tasks! Enjoy the break or await dispatcher updates.
+                </div>
+
+                <div th:if="${!activeDeliveries.isEmpty()}" class="table-responsive">
+                    <table class="table align-middle table-hover">
+                        <thead>
+                            <tr>
+                                <th>Order ID</th>
+                                <th>Fuel Station</th>
+                                <th>Delivery Dropoff</th>
+                                <th>Fuel Details</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="job : ${activeDeliveries}">
+                                <td th:text="'#' + ${job.id}">#1</td>
+                                <td>
+                                    <strong th:text="${job.provider.fullName}">Apex Fuels</strong>
+                                    <span class="d-block text-xs text-muted" th:text="${job.provider.address}">Base Location</span>
+                                </td>
+                                <td>
+                                    <span class="fw-semibold" th:text="${job.customer.fullName}">Customer Name</span>
+                                    <span class="d-block text-xs text-muted" th:text="${job.deliveryAddress}">Dropoff</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-secondary" th:text="${job.fuelType.name}">Diesel</span>
+                                    <span th:if="${job.isEmergency}" class="badge bg-danger">EMERGENCY</span>
+                                    <span class="d-block text-xs text-muted" th:text="${#numbers.formatDecimal(job.quantityLiters, 1, 2)} + ' L'">30 L</span>
+                                </td>
+                                <td>
+                                    <span class="status-badge" 
+                                          th:classappend="${job.status == 'AGENT_ASSIGNED' ? 'status-assigned' : 'status-delivery'}"
+                                          th:text="${job.status}">
+                                        AGENT_ASSIGNED
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="d-flex gap-2">
+                                        <!-- Accept Dispatch Job -->
+                                        <form th:if="${job.status == 'AGENT_ASSIGNED'}" th:action="@{/agent/order/accept}" method="post">
+                                            <input type="hidden" name="orderId" th:value="${job.id}">
+                                            <button type="submit" class="btn btn-sm btn-primary-gradient"><i class="bi bi-truck me-1"></i> Accept Job</button>
+                                        </form>
+
+                                        <!-- OTP Verification Modal Trigger -->
+                                        <button th:if="${job.status == 'OUT_FOR_DELIVERY'}" 
+                                                class="btn btn-sm btn-success otp-verify-trigger"
+                                                th:data-job-id="${job.id}"
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#otpVerifyModal">
+                                            <i class="bi bi-shield-check me-1"></i> Verify & Deliver
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+        </div>
+    </div>
+</div>
+
+<!-- OTP Verification Modal -->
+<div class="modal fade" id="otpVerifyModal" tabindex="-1" aria-labelledby="otpVerifyModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark text-white border border-light border-opacity-10 rounded-4">
+            <div class="modal-header border-bottom border-light border-opacity-10">
+                <h5 class="modal-title fw-bold" id="otpVerifyModalLabel"><i class="bi bi-shield-lock-fill text-warning me-2"></i>Verify OTP Delivery</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form th:action="@{/agent/order/verify-otp}" method="post">
+                <input type="hidden" name="orderId" id="modalJobId">
+                <div class="modal-body text-center p-4">
+                    <p class="text-secondary mb-4">Request the 6-digit confirmation security OTP from the customer at drop-off location.</p>
+                    
+                    <!-- 6-digit OTP Inputs -->
+                    <div class="d-flex justify-content-center gap-2 mb-4">
+                        <input type="text" maxlength="1" class="form-control otp-digit text-center fw-bold fs-4" style="width: 50px; height: 55px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: #ffffff;" required>
+                        <input type="text" maxlength="1" class="form-control otp-digit text-center fw-bold fs-4" style="width: 50px; height: 55px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: #ffffff;" required>
+                        <input type="text" maxlength="1" class="form-control otp-digit text-center fw-bold fs-4" style="width: 50px; height: 55px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: #ffffff;" required>
+                        <input type="text" maxlength="1" class="form-control otp-digit text-center fw-bold fs-4" style="width: 50px; height: 55px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: #ffffff;" required>
+                        <input type="text" maxlength="1" class="form-control otp-digit text-center fw-bold fs-4" style="width: 50px; height: 55px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: #ffffff;" required>
+                        <input type="text" maxlength="1" class="form-control otp-digit text-center fw-bold fs-4" style="width: 50px; height: 55px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: #ffffff;" required>
+                    </div>
+
+                    <!-- Hidden Input to combine OTP digits -->
+                    <input type="hidden" name="otp" id="otp-code-hidden">
+                </div>
+                <div class="modal-footer border-top border-light border-opacity-10">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="submit" class="btn btn-success"><i class="bi bi-patch-check me-1"></i> Verify Code</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div th:replace="~{layout/main :: footer}"></div>
+
+<script>
+    document.querySelectorAll('.otp-verify-trigger').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const jobId = btn.getAttribute('th:data-job-id') || btn.getAttribute('data-job-id');
+            document.getElementById('modalJobId').value = jobId;
+        });
+    });
+</script>
+
+</body>
+</html>

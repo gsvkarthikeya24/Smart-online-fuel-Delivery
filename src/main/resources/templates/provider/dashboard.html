@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{layout/main :: header('Provider Dashboard')}"></head>
+<body>
+
+<div class="app-container">
+    <!-- Sidebar -->
+    <div th:replace="~{layout/main :: sidebar('dashboard')}"></div>
+
+    <div class="main-wrapper">
+        <!-- Top Navbar -->
+        <div th:replace="~{layout/main :: navbar('Provider Dashboard')}"></div>
+
+        <!-- Main Content -->
+        <div class="container-fluid p-4 animate-fade-in">
+            
+            <!-- Low stock notification alert -->
+            <div th:if="${!lowStockAlerts.isEmpty()}" class="alert alert-warning border-0 bg-warning bg-opacity-10 text-warning rounded-4 p-3 mb-4">
+                <h6 class="fw-bold mb-1"><i class="bi bi-exclamation-triangle-fill me-2 text-danger"></i>Low Inventory Warning!</h6>
+                <p class="mb-0 text-sm">One or more fuel types in your inventory have fallen below the 15% safety stock limit. Please replenish immediately to avoid rejection of incoming customer orders.</p>
+            </div>
+
+            <!-- KPI Cards -->
+            <div class="row g-4 mb-4">
+                <div class="col-md-4">
+                    <div class="glass-card kpi-card">
+                        <div>
+                            <span class="text-secondary text-sm d-block mb-1">Total Revenue</span>
+                            <h3 class="mb-0 fw-bold" th:text="'₹' + ${#numbers.formatDecimal(revenue, 1, 2)}">₹0.00</h3>
+                            <small class="text-muted" style="font-size: 0.75rem;">Completed delivery earnings</small>
+                        </div>
+                        <div class="kpi-icon">
+                            <i class="bi bi-cash-stack"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="glass-card kpi-card">
+                        <div>
+                            <span class="text-secondary text-sm d-block mb-1">Active Deliveries</span>
+                            <h3 class="mb-0 fw-bold" th:text="${activeOrdersCount}">0</h3>
+                            <small class="text-muted" style="font-size: 0.75rem;">Jobs currently in pipeline</small>
+                        </div>
+                        <div class="kpi-icon secondary">
+                            <i class="bi bi-clock"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="glass-card kpi-card">
+                        <div>
+                            <span class="text-secondary text-sm d-block mb-1">Total Orders List</span>
+                            <h3 class="mb-0 fw-bold" th:text="${totalOrdersCount}">0</h3>
+                            <small class="text-muted" style="font-size: 0.75rem;">All-time requests logs</small>
+                        </div>
+                        <div class="kpi-icon accent">
+                            <i class="bi bi-journal-check"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Fuel Inventory Stocks & Recent Orders -->
+            <div class="row g-4">
+                <!-- Stock Details -->
+                <div class="col-lg-6">
+                    <div class="glass-card h-100">
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <h5 class="fw-bold mb-0">Inventory Levels</h5>
+                            <a th:href="@{/provider/inventory}" class="btn btn-sm btn-outline-primary"><i class="bi bi-gear-fill"></i> Adjust Stocks</a>
+                        </div>
+
+                        <div th:if="${inventory.isEmpty()}" class="text-center py-5 text-secondary">
+                            <i class="bi bi-clipboard-x fs-1 mb-3 d-block text-muted"></i>
+                            No fuel stocks defined. Go to Stock Controls to add capacity!
+                        </div>
+
+                        <div th:each="inv : ${inventory}" class="mb-4">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="fw-semibold text-primary" th:text="${inv.fuelType.name}">Petrol</span>
+                                <span class="text-muted" th:text="${#numbers.formatDecimal(inv.currentStockLiters, 1, 2)} + ' / ' + ${#numbers.formatDecimal(inv.maxCapacityLiters, 1, 2)} + ' L'">4000/5000L</span>
+                            </div>
+                            <!-- Calculate progress percentage -->
+                            <div class="progress bg-dark bg-opacity-25" style="height: 10px;">
+                                <div class="progress-bar" role="progressbar" 
+                                     th:style="'width: ' + (${inv.currentStockLiters} / ${inv.maxCapacityLiters} * 100) + '%'"
+                                     th:classappend="${inv.currentStockLiters < (inv.maxCapacityLiters * 0.15) ? 'bg-danger' : 'bg-primary'}"
+                                     aria-valuenow="50" aria-valuemin="0" aria-valuemax="100"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Orders list -->
+                <div class="col-lg-6">
+                    <div class="glass-card h-100">
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <h5 class="fw-bold mb-0">Recent Order Activity</h5>
+                            <a th:href="@{/provider/orders}" class="btn btn-sm btn-primary-gradient"><i class="bi bi-list-task"></i> Operations Panel</a>
+                        </div>
+
+                        <div th:if="${orders.isEmpty()}" class="text-center py-5 text-secondary">
+                            No incoming orders found.
+                        </div>
+
+                        <div th:if="${!orders.isEmpty()}" class="table-responsive">
+                            <table class="table align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>Order ID</th>
+                                        <th>Fuel</th>
+                                        <th>Qty</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr th:each="ord : ${orders}">
+                                        <td th:text="'#' + ${ord.id}">#2</td>
+                                        <td th:text="${ord.fuelType.name}">Petrol</td>
+                                        <td th:text="${#numbers.formatDecimal(ord.quantityLiters, 1, 2)} + ' L'">20L</td>
+                                        <td>
+                                            <span class="status-badge" 
+                                                  th:classappend="${ord.status == 'CREATED' ? 'status-created' : 
+                                                                   (ord.status == 'ACCEPTED' ? 'status-accepted' : 
+                                                                   (ord.status == 'AGENT_ASSIGNED' ? 'status-assigned' : 
+                                                                   (ord.status == 'OUT_FOR_DELIVERY' ? 'status-delivery' : 
+                                                                   (ord.status == 'DELIVERED' ? 'status-delivered' : 
+                                                                   (ord.status == 'REVIEWED' ? 'status-delivered' : 'status-rejected')))))}"
+                                                  th:text="${ord.status}">
+                                                CREATED
+                                            </span>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+        </div>
+    </div>
+</div>
+
+<div th:replace="~{layout/main :: footer}"></div>
+</body>
+</html>
